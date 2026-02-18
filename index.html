@@ -267,7 +267,7 @@
 </header>
 
 <div class="formula-bar">
-  <div class="formula-item">Module grade = <strong>DS × 20%</strong> + <strong>Exam × 80%</strong></div>
+  <div class="formula-item">Module grade = <strong>DS × 30%</strong> + <strong>Exam × 70%</strong></div>
   <div class="formula-item">Unit average = <strong>Σ(grade × coeff) / Σcoeff</strong></div>
   <div class="formula-item">Pass threshold = <strong>10 / 20</strong></div>
 </div>
@@ -358,7 +358,7 @@ function calcModuleGrade(ds, exam) {
   if (ds === '' || exam === '') return null;
   const d = parseFloat(ds), e = parseFloat(exam);
   if (isNaN(d) || isNaN(e)) return null;
-  return d * 0.2 + e * 0.8;
+  return d * 0.3 + e * 0.7;
 }
 
 function gradeColor(g) {

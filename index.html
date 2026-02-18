@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S3 Grade Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --card: #16161f;
+    --border: #2a2a3a;
+    --accent: #c84b31;
+    --accent2: #e8855a;
+    --gold: #f0c060;
+    --text: #e8e8f0;
+    --muted: #7070a0;
+    --pass: #4ecdc4;
+    --fail: #e05555;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    padding: 0 0 80px;
+  }
+
+  /* Noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0; opacity: 0.4;
+  }
+
+  header {
+    background: linear-gradient(135deg, #1a0a06 0%, #0f0f1a 60%);
+    border-bottom: 1px solid var(--border);
+    padding: 48px 40px 36px;
+    position: relative;
+    overflow: hidden;
+  }
+  header::after {
+    content: 'S3';
+    position: absolute; right: 40px; top: 50%; transform: translateY(-50%);
+    font-family: 'Syne', sans-serif;
+    font-size: 120px; font-weight: 800;
+    color: transparent;
+    -webkit-text-stroke: 1px rgba(200,75,49,0.15);
+    pointer-events: none;
+    line-height: 1;
+  }
+
+  .header-tag {
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 12px;
+  }
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 800; color: var(--text);
+    line-height: 1.1;
+  }
+  h1 span { color: var(--accent2); }
+  .header-sub {
+    margin-top: 10px; color: var(--muted); font-size: 12px;
+  }
+
+  .formula-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 40px;
+    display: flex; gap: 32px; flex-wrap: wrap; align-items: center;
+  }
+  .formula-item { font-size: 11px; color: var(--muted); }
+  .formula-item strong { color: var(--gold); }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 40px 20px 0; position: relative; z-index: 1; }
+
+  .units-grid {
+    display: grid; gap: 20px;
+  }
+
+  .unit-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+    animation: fadeUp 0.4s ease both;
+  }
+  .unit-card:hover { border-color: #3a3a5a; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .unit-card:nth-child(1) { animation-delay: 0.05s; }
+  .unit-card:nth-child(2) { animation-delay: 0.10s; }
+  .unit-card:nth-child(3) { animation-delay: 0.15s; }
+  .unit-card:nth-child(4) { animation-delay: 0.20s; }
+  .unit-card:nth-child(5) { animation-delay: 0.25s; }
+  .unit-card:nth-child(6) { animation-delay: 0.30s; }
+
+  .unit-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px;
+    background: #0e0e16;
+    border-bottom: 1px solid var(--border);
+  }
+  .unit-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .unit-avg {
+    font-size: 18px; font-weight: 500;
+    font-family: 'Syne', sans-serif;
+    min-width: 60px; text-align: right;
+  }
+
+  .modules-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .modules-table thead tr {
+    background: rgba(255,255,255,0.02);
+  }
+  .modules-table th {
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--muted); padding: 8px 20px; text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+  }
+  .modules-table th.center { text-align: center; }
+  .modules-table td {
+    padding: 10px 20px;
+    border-bottom: 1px solid rgba(42,42,58,0.5);
+    font-size: 12px;
+    vertical-align: middle;
+  }
+  .modules-table tr:last-child td { border-bottom: none; }
+
+  .module-name { color: var(--text); }
+  .module-code { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .coeff-badge {
+    display: inline-block;
+    background: rgba(240,192,96,0.1);
+    border: 1px solid rgba(240,192,96,0.2);
+    color: var(--gold);
+    font-size: 10px; padding: 2px 8px; border-radius: 2px;
+    text-align: center;
+  }
+
+  input[type="number"] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    padding: 6px 10px;
+    width: 70px;
+    border-radius: 2px;
+    text-align: center;
+    transition: border-color 0.2s, background 0.2s;
+    -moz-appearance: textfield;
+  }
+  input[type="number"]::-webkit-inner-spin-button { display: none; }
+  input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent2);
+    background: #1a1a25;
+  }
+  input[type="number"].invalid { border-color: var(--fail); }
+
+  .module-grade {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px; font-weight: 600;
+    text-align: center; min-width: 50px;
+    transition: color 0.3s;
+  }
+
+  /* Summary */
+  .summary-section {
+    margin-top: 32px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .summary-header {
+    background: #0e0e16;
+    padding: 16px 24px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700; font-size: 12px;
+    letter-spacing: 2px; text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0;
+  }
+  .summary-stat {
+    padding: 24px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .summary-stat:last-child { border-right: none; }
+  .stat-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .stat-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px; font-weight: 800;
+    line-height: 1;
+  }
+  .stat-sub { font-size: 10px; color: var(--muted); margin-top: 6px; }
+
+  .mention-badge {
+    display: inline-block;
+    padding: 4px 12px; border-radius: 2px;
+    font-size: 10px; font-weight: 600; letter-spacing: 2px;
+    text-transform: uppercase; margin-top: 8px;
+  }
+
+  .btn-reset {
+    display: block;
+    margin: 32px auto 0;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 10px 28px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+  .btn-reset:hover { border-color: var(--accent); color: var(--accent); }
+
+  .grade-pass { color: var(--pass); }
+  .grade-fail { color: var(--fail); }
+  .grade-warn { color: var(--gold); }
+  .grade-empty { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-tag">&#9632; Academic Tools — 2025/2026</div>
+  <h1>Grade <span>Calculator</span></h1>
+  <div class="header-sub">Semester 3 · Engineering Program</div>
+  <div style="margin-top:18px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+    <div style="background:rgba(200,75,49,0.12); border:1px solid rgba(200,75,49,0.3); border-radius:3px; padding:8px 18px; display:inline-flex; flex-direction:column; gap:3px;">
+      <span style="font-size:9px; letter-spacing:3px; text-transform:uppercase; color:var(--accent);">Student</span>
+      <span style="font-family:'Syne',sans-serif; font-size:15px; font-weight:700; color:var(--text);">Ayoub Benissa</span>
+    </div>
+    <div style="background:rgba(240,192,96,0.08); border:1px solid rgba(240,192,96,0.2); border-radius:3px; padding:8px 18px; display:inline-flex; flex-direction:column; gap:3px;">
+      <span style="font-size:9px; letter-spacing:3px; text-transform:uppercase; color:var(--gold);">Class</span>
+      <span style="font-family:'Syne',sans-serif; font-size:15px; font-weight:700; color:var(--text);">2CS G1</span>
+    </div>
+  </div>
+</header>
+
+<div class="formula-bar">
+  <div class="formula-item">Module grade = <strong>DS × 20%</strong> + <strong>Exam × 80%</strong></div>
+  <div class="formula-item">Unit average = <strong>Σ(grade × coeff) / Σcoeff</strong></div>
+  <div class="formula-item">Pass threshold = <strong>10 / 20</strong></div>
+</div>
+
+<main>
+  <div class="units-grid" id="units"></div>
+
+  <div class="summary-section" style="animation: fadeUp 0.4s 0.4s ease both; opacity:0; animation-fill-mode: both;">
+    <div class="summary-header">&#9632; Semester Summary</div>
+    <div class="summary-grid">
+      <div class="summary-stat">
+        <div class="stat-label">Overall Average</div>
+        <div class="stat-value" id="overall-avg">—</div>
+        <div class="stat-sub">out of 20</div>
+      </div>
+      <div class="summary-stat">
+        <div class="stat-label">Total Credits</div>
+        <div class="stat-value" id="total-coeff">15</div>
+        <div class="stat-sub">coefficients</div>
+      </div>
+      <div class="summary-stat">
+        <div class="stat-label">Status</div>
+        <div class="stat-value" id="status-val">—</div>
+        <div class="stat-sub" id="mention-label"></div>
+      </div>
+      <div class="summary-stat">
+        <div class="stat-label">Modules Filled</div>
+        <div class="stat-value" id="filled-count">0 / 12</div>
+        <div class="stat-sub">modules entered</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-reset" onclick="resetAll()">↺ Reset All Grades</button>
+</main>
+
+<script>
+const data = [
+  {
+    name: "Probability",
+    modules: [
+      { code: "ECUEF311", name: "Probability and statistics", coeff: 2 }
+    ]
+  },
+  {
+    name: "Automata and Optimization",
+    modules: [
+      { code: "ECUEF321", name: "Language theory and Automata", coeff: 1 },
+      { code: "ECUEF322", name: "Graphs and optimization", coeff: 1 }
+    ]
+  },
+  {
+    name: "CPOO",
+    modules: [
+      { code: "ECUEF331", name: "Design of Information System", coeff: 1.5 },
+      { code: "ECUEF332", name: "Java Programming", coeff: 2 }
+    ]
+  },
+  {
+    name: "Basics of Data and Networks",
+    modules: [
+      { code: "ECUEF341", name: "Database Engineering", coeff: 1.5 },
+      { code: "ECUEF342", name: "Network Services", coeff: 1 }
+    ]
+  },
+  {
+    name: "Language and Business Management",
+    modules: [
+      { code: "ECUET311", name: "English 3", coeff: 1 },
+      { code: "ECUET312", name: "Business Management", coeff: 1 }
+    ]
+  },
+  {
+    name: "Software Engineering",
+    modules: [
+      { code: "UECO311", name: "Problem Solving", coeff: 1.5 },
+      { code: "UECO312", name: "Guided Project", coeff: 1.5 }
+    ]
+  }
+];
+
+// State: { unitIdx_moduleIdx: { ds, exam } }
+const state = {};
+
+function getKey(u, m) { return `${u}_${m}`; }
+
+function calcModuleGrade(ds, exam) {
+  if (ds === '' || exam === '') return null;
+  const d = parseFloat(ds), e = parseFloat(exam);
+  if (isNaN(d) || isNaN(e)) return null;
+  return d * 0.2 + e * 0.8;
+}
+
+function gradeColor(g) {
+  if (g === null) return 'grade-empty';
+  if (g >= 14) return 'grade-pass';
+  if (g >= 10) return 'grade-warn';
+  return 'grade-fail';
+}
+
+function fmt(val) {
+  if (val === null || isNaN(val)) return '—';
+  return val.toFixed(2);
+}
+
+function buildUI() {
+  const container = document.getElementById('units');
+  container.innerHTML = '';
+
+  data.forEach((unit, ui) => {
+    const card = document.createElement('div');
+    card.className = 'unit-card';
+
+    const header = document.createElement('div');
+    header.className = 'unit-header';
+    header.innerHTML = `<div class="unit-name">${ui+1}. ${unit.name}</div><div class="unit-avg" id="unit-avg-${ui}">—</div>`;
+    card.appendChild(header);
+
+    const table = document.createElement('table');
+    table.className = 'modules-table';
+    table.innerHTML = `<thead><tr>
+      <th>Module</th>
+      <th class="center">Coeff</th>
+      <th class="center">DS /20</th>
+      <th class="center">Exam /20</th>
+      <th class="center">Grade</th>
+    </tr></thead>`;
+    const tbody = document.createElement('tbody');
+
+    unit.modules.forEach((mod, mi) => {
+      const key = getKey(ui, mi);
+      if (!state[key]) state[key] = { ds: '', exam: '' };
+      const s = state[key];
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>
+          <div class="module-name">${mod.name}</div>
+          <div class="module-code">${mod.code}</div>
+        </td>
+        <td style="text-align:center"><span class="coeff-badge">${mod.coeff}</span></td>
+        <td style="text-align:center">
+          <input type="number" min="0" max="20" step="0.25" placeholder="—"
+            id="ds-${ui}-${mi}" value="${s.ds}"
+            oninput="onInput(${ui},${mi},'ds',this.value)">
+        </td>
+        <td style="text-align:center">
+          <input type="number" min="0" max="20" step="0.25" placeholder="—"
+            id="exam-${ui}-${mi}" value="${s.exam}"
+            oninput="onInput(${ui},${mi},'exam',this.value)">
+        </td>
+        <td class="module-grade" id="grade-${ui}-${mi}">—</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    card.appendChild(table);
+    container.appendChild(card);
+  });
+
+  recalcAll();
+}
+
+function onInput(ui, mi, field, val) {
+  const key = getKey(ui, mi);
+  const num = parseFloat(val);
+  if (val !== '' && (isNaN(num) || num < 0 || num > 20)) {
+    document.getElementById(`${field}-${ui}-${mi}`).classList.add('invalid');
+  } else {
+    document.getElementById(`${field}-${ui}-${mi}`).classList.remove('invalid');
+  }
+  state[key][field] = val;
+  recalcAll();
+}
+
+function recalcAll() {
+  let totalWeightedSum = 0, totalCoeff = 0;
+  let filledCount = 0;
+  const totalModules = data.reduce((a, u) => a + u.modules.length, 0);
+
+  data.forEach((unit, ui) => {
+    let unitSum = 0, unitCoeff = 0;
+
+    unit.modules.forEach((mod, mi) => {
+      const key = getKey(ui, mi);
+      const s = state[key];
+      const g = calcModuleGrade(s.ds, s.exam);
+
+      const gradeEl = document.getElementById(`grade-${ui}-${mi}`);
+      gradeEl.className = 'module-grade ' + gradeColor(g);
+      gradeEl.textContent = g !== null ? fmt(g) : '—';
+
+      if (g !== null) {
+        unitSum += g * mod.coeff;
+        unitCoeff += mod.coeff;
+        totalWeightedSum += g * mod.coeff;
+        totalCoeff += mod.coeff;
+        filledCount++;
+      }
+    });
+
+    const unitAvgEl = document.getElementById(`unit-avg-${ui}`);
+    if (unitCoeff > 0) {
+      const avg = unitSum / unitCoeff;
+      unitAvgEl.className = 'unit-avg ' + gradeColor(avg);
+      unitAvgEl.textContent = fmt(avg);
+    } else {
+      unitAvgEl.className = 'unit-avg grade-empty';
+      unitAvgEl.textContent = '—';
+    }
+  });
+
+  // Summary
+  const overallEl = document.getElementById('overall-avg');
+  const statusEl = document.getElementById('status-val');
+  const mentionEl = document.getElementById('mention-label');
+  document.getElementById('filled-count').textContent = `${filledCount} / ${totalModules}`;
+
+  if (totalCoeff > 0) {
+    const avg = totalWeightedSum / totalCoeff;
+    overallEl.textContent = fmt(avg);
+    overallEl.className = 'stat-value ' + gradeColor(avg);
+
+    if (avg >= 16) {
+      statusEl.textContent = 'PASS'; statusEl.className = 'stat-value grade-pass';
+      mentionEl.innerHTML = '<span class="mention-badge" style="background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.3);color:var(--pass)">Très Bien</span>';
+    } else if (avg >= 14) {
+      statusEl.textContent = 'PASS'; statusEl.className = 'stat-value grade-pass';
+      mentionEl.innerHTML = '<span class="mention-badge" style="background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.3);color:var(--pass)">Bien</span>';
+    } else if (avg >= 12) {
+      statusEl.textContent = 'PASS'; statusEl.className = 'stat-value grade-pass';
+      mentionEl.innerHTML = '<span class="mention-badge" style="background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.3);color:var(--pass)">Assez Bien</span>';
+    } else if (avg >= 10) {
+      statusEl.textContent = 'PASS'; statusEl.className = 'stat-value grade-warn';
+      mentionEl.innerHTML = '<span class="mention-badge" style="background:rgba(240,192,96,0.1);border:1px solid rgba(240,192,96,0.3);color:var(--gold)">Passable</span>';
+    } else {
+      statusEl.textContent = 'FAIL'; statusEl.className = 'stat-value grade-fail';
+      mentionEl.innerHTML = '<span class="mention-badge" style="background:rgba(224,85,85,0.1);border:1px solid rgba(224,85,85,0.3);color:var(--fail)">Insuffisant</span>';
+    }
+  } else {
+    overallEl.textContent = '—'; overallEl.className = 'stat-value grade-empty';
+    statusEl.textContent = '—'; statusEl.className = 'stat-value grade-empty';
+    mentionEl.textContent = 'Enter your grades';
+  }
+}
+
+function resetAll() {
+  Object.keys(state).forEach(k => { state[k] = { ds: '', exam: '' }; });
+  buildUI();
+}
+
+buildUI();
+</script>
+</body>
+</html>
